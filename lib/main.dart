@@ -1,7 +1,56 @@
 import 'package:flutter/material.dart';
+import 'dart:collection';
 
 void main() {
-  runApp(const PresApp());
+  PresTable presTable = PresTable();
+  runApp(PresApp(presTable: presTable));
+}
+
+class PresTableState {
+  int autoInc = 0;
+  final Map<int, String> idToName = new HashMap(); 
+}
+
+class PresTable extends Iterable<MapEntry<int, String>> {
+  final PresTableState _state;
+  final void Function() _onUpdate;
+
+  PresTable(): 
+    _state = PresTableState(),
+    _onUpdate = (() {});
+
+  PresTable.proxy({ required target, required onUpdate }):
+    _state = target._state,
+    _onUpdate = (() {
+      onUpdate();
+      target._onUpdate();
+    });
+
+  Iterator<MapEntry<int, String>> get iterator {
+    return _state.idToName.entries.iterator;
+  }
+
+  String get(int id) {
+    return _state.idToName[id] ?? "?";
+  }
+
+  int insert(String name) {
+    int id = _state.autoInc;
+    _state.autoInc += 1;
+    _state.idToName[id] = name;
+    _onUpdate();
+    return id;
+  }
+
+  void rename(int id, String newName) {
+    _state.idToName[id] = newName;
+    _onUpdate();
+  }
+
+  void remove(int id) {
+    _state.idToName.remove(id);
+    _onUpdate();
+  }
 }
 
 class PresButton extends StatelessWidget {
@@ -47,57 +96,36 @@ class PresButton extends StatelessWidget {
 }
 
 class PresApp extends StatelessWidget {
-  const PresApp({super.key});
+  final PresTable presTable;
 
-  // This widget is the root of your application.
+  PresApp({super.key, required this.presTable});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const PresHomePage(),
+      home: PresHomePage(presTable: presTable),
     );
   }
 }
 
 class PresHomePage extends StatefulWidget {
-  const PresHomePage({super.key});
+  final PresTable presTable;
+
+  PresHomePage({super.key, required this.presTable});
 
   @override
-  State<PresHomePage> createState() => _PresHomePageState([
-    "Campos Quânticos",
-    "Gravidade em Loop"
-  ]);
+  State<PresHomePage> createState() => _PresHomePageState(this.presTable);
 }
 
 class _PresHomePageState extends State<PresHomePage> {
-  List<String> _presentations = [];
+  PresTable _presTable;
 
-  _PresHomePageState(List<String> presentations) {
-    _presentations = presentations;
-  }
-
-  void addFile(String title) {
-    setState(() {
-      _presentations.add(title);
-    });
+  _PresHomePageState(PresTable presTable): _presTable = presTable {
+    _presTable = PresTable.proxy(target: presTable, onUpdate: () => setState(() {}));
   }
 
   @override
@@ -118,18 +146,22 @@ class _PresHomePageState extends State<PresHomePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => PresSavePage(
-                    actionName: "Criar",
+                    actionText: "Criar",
+                    presTable: _presTable,
                   )),
                 );
               },
             ),
-            ..._presentations.map((title) => PresButton(
-              text: title,
+            ..._presTable.map((entry) => PresButton(
+              text: entry.value,
               textStyle: Theme.of(context).textTheme.headlineLarge,
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => PresActionPage(title: title))
+                  MaterialPageRoute(builder: (context) => PresActionPage(
+                    id: entry.key,
+                    presTable: _presTable,
+                  ))
                 );
               }
             ))
@@ -141,21 +173,28 @@ class _PresHomePageState extends State<PresHomePage> {
 }
 
 class PresActionPage extends StatefulWidget {
-  final String title;
+  final int id;
+  final PresTable presTable;
 
-  const PresActionPage({super.key, required this.title});
+  PresActionPage({super.key, required this.id, required this.presTable});
 
   @override
-  State<PresActionPage> createState() => _PresActionPageState();
+  State<PresActionPage> createState() => _PresActionPageState(presTable);
 }
 
 class _PresActionPageState extends State<PresActionPage> {
+  PresTable _presTable;
+
+  _PresActionPageState(PresTable presTable): _presTable = presTable {
+    _presTable = PresTable.proxy(target: presTable, onUpdate: () => setState(() {}));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text('Arquivo: ' + widget.title),
+        title: Text('Arquivo: ' + _presTable.get(widget.id)),
       ),
       body: Center(
         child: Column(
@@ -172,8 +211,9 @@ class _PresActionPageState extends State<PresActionPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => PresSavePage(
-                    actionName: "Renomear",
-                    previousTitle: widget.title,
+                    actionText: "Renomear",
+                    id: widget.id,
+                    presTable: _presTable,
                   )),
                 );
               },
@@ -185,6 +225,7 @@ class _PresActionPageState extends State<PresActionPage> {
                 side: BorderSide(color: Colors.red)
               ),
               onPressed: () {
+                _presTable.remove(widget.id);
                 Navigator.popUntil(context, ModalRoute.withName('/'));
               }
             ),
@@ -198,7 +239,7 @@ class _PresActionPageState extends State<PresActionPage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => PresHomePage())
+                  MaterialPageRoute(builder: (context) => PresHomePage(presTable: _presTable))
                 );
               }
             ),
@@ -210,26 +251,37 @@ class _PresActionPageState extends State<PresActionPage> {
 }
 
 class PresSavePage extends StatefulWidget {
-  final String previousTitle;
-  final String actionName;
+  final String actionText;
+  final int? id;
+  final PresTable presTable;
 
-  const PresSavePage({super.key, required this.actionName, this.previousTitle = ""});
+  PresSavePage({super.key, required this.actionText, this.id = null, required this.presTable }); 
 
   @override
-  State<PresSavePage> createState() => _PresSavePageState(title: this.previousTitle);
+  State<PresSavePage> createState() => _PresSavePageState(presTable, this.id);
 }
 
 class _PresSavePageState extends State<PresSavePage> {
-  String _title;
+  String _name;
+  PresTable _presTable;
 
-  _PresSavePageState({required title}): _title = title;
+  _PresSavePageState(PresTable presTable, int? id):
+    _name = id is int ? presTable.get(id!) : "",
+   _presTable = presTable
+  {
+    _presTable = PresTable.proxy(target: presTable, onUpdate: () => setState(() {}));
+  }
+
+  String _previousName() {
+    return widget.id is int ? _presTable.get(widget.id!) : "";
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.actionName + ': ' + widget.previousTitle),
+        title: Text(widget.actionText + ': ' + _previousName()),
       ),
       body: Center(
         child: Column(
@@ -239,12 +291,20 @@ class _PresSavePageState extends State<PresSavePage> {
               padding: EdgeInsets.symmetric(horizontal: 32.0),
               child: TextField(
                 maxLines: null,
+                onChanged: (text) {
+                  _name = text;
+                },
               ),
             ),
             PresButton(
               text: 'SALVAR',
               textStyle: Theme.of(context).textTheme.headlineMedium,
               onPressed: () {
+                if (widget.id is int) {
+                  _presTable.rename(widget.id!, _name);
+                } else {
+                  _presTable.insert(_name);
+                }
                 Navigator.pop(context);
               },
             ),
