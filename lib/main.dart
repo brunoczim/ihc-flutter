@@ -185,7 +185,8 @@ class _PresActionPageState extends State<PresActionPage> {
                 side: BorderSide(color: Colors.red)
               ),
               onPressed: () {
-              },
+                Navigator.popUntil(context, ModalRoute.withName('/'));
+              }
             ),
             PresButton(
               text: 'COMPARTILHAR',
