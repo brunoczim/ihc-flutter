@@ -164,6 +164,10 @@ class _PresActionPageState extends State<PresActionPage> {
             PresButton(
               text: 'EDITAR',
               textStyle: Theme.of(context).textTheme.headlineMedium,
+            ),
+            PresButton(
+              text: 'RENOMEAR',
+              textStyle: Theme.of(context).textTheme.headlineMedium,
               onPressed: () {
                 Navigator.push(
                   context,
@@ -173,10 +177,6 @@ class _PresActionPageState extends State<PresActionPage> {
                   )),
                 );
               },
-            ),
-            PresButton(
-              text: 'RENOMEAR',
-              textStyle: Theme.of(context).textTheme.headlineMedium,
             ),
             PresButton(
               text: 'DELETAR',
@@ -234,6 +234,12 @@ class _PresSavePageState extends State<PresSavePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 32.0),
+              child: TextField(
+                maxLines: null,
+              ),
+            ),
             PresButton(
               text: 'SALVAR',
               textStyle: Theme.of(context).textTheme.headlineMedium,
